@@ -142,7 +142,6 @@ impl<'a, S: Stream> RequestBuffer<'a, S> {
             }
             (Ok(header), None) => {
                 // This should have read an extra byte, on account of the CR LF SP possibility
-                error!("header with no next byte, did reading go wrong?");
                 Ok(header)
             }
         }

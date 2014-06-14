@@ -25,15 +25,12 @@ pub trait Server: Send + Clone {
 	 */
     fn serve_forever(self) {
         let config = self.get_config();
-        debug!("About to bind to {}", config.bind_address);
         let mut acceptor = match TcpListener::bind(config.bind_address.ip.to_str().as_slice(), config.bind_address.port).listen() {
             Err(err) => {
-                error!("bind or listen failed :-(: {}", err);
                 return;
             },
             Ok(acceptor) => acceptor,
         };
-        debug!("listening");
         let (perf_sender, perf_receiver) = channel();
         spawn(proc() {
             perf_dumper(perf_receiver);
@@ -42,7 +39,6 @@ pub trait Server: Send + Clone {
             let time_start = precise_time_ns();
             let stream = match acceptor.accept() {
                 Err(error) => {
-                    debug!("accept failed: {}", error);
                     // Question: is this the correct thing to do? We should probably be more
                     // intelligent, for there are some accept failures that are likely to be
                     // permanent, such that continuing would be a very bad idea, such as
@@ -57,7 +53,6 @@ pub trait Server: Send + Clone {
             spawn(proc() {
                 let mut time_start = time_start;
                 let mut stream = BufferedStream::new(stream);
-                debug!("accepted connection");
                 loop {  // A keep-alive loop, condition at end
                     let time_spawned = precise_time_ns();
                     let (request, err_status) = Request::load(&mut stream);
@@ -70,7 +65,6 @@ pub trait Server: Send + Clone {
                             // Ensure that we actually do send a response:
                             match response.try_write_headers() {
                                 Err(err) => {
-                                    error!("Writing headers failed: {}", err);
                                     return;  // Presumably bad connection, so give up.
                                 },
                                 Ok(_) => (),
@@ -84,7 +78,6 @@ pub trait Server: Send + Clone {
                             response.headers.content_length = Some(0);
                             match response.write_headers() {
                                 Err(err) => {
-                                    error!("Writing headers failed: {}", err);
                                     return;  // Presumably bad connection, so give up.
                                 },
                                 Ok(_) => (),
@@ -94,7 +87,6 @@ pub trait Server: Send + Clone {
                     // Ensure the request is flushed, any Transfer-Encoding completed, etc.
                     match response.finish_response() {
                         Err(err) => {
-                            error!("finishing response failed: {}", err);
                             return;  // Presumably bad connection, so give up.
                         },
                         Ok(_) => (),
